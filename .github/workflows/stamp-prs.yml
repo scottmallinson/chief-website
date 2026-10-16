@@ -1,0 +1,55 @@
+# Puts the app repo's open pull requests into the picture of the app.
+#
+# scottmallinson/chief.ai sends an `open-prs` event whenever a pull request is
+# opened, closed, edited or moves between draft and ready (see its
+# site-prs.yml). This writes the oldest waiting one into site/index.html and
+# commits it; Vercel deploys that commit. Nothing runs on a timer, and a change
+# that leaves the card as it was commits nothing and so deploys nothing.
+name: Stamp pull requests
+
+on:
+  repository_dispatch:
+    types: [open-prs]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# One at a time, newest last: each event carries the whole list, so a run that
+# is waiting behind another only has to be the latest to be right.
+concurrency:
+  group: stamp-prs
+
+jobs:
+  stamp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      # The payload goes through the environment and into a file, never into
+      # the shell command line: it contains pull request titles, which anybody
+      # who can open a pull request chooses.
+      - name: Write the payload
+        env:
+          PRS: ${{ toJson(github.event.client_payload.prs) }}
+        run: printf '%s' "${PRS:-[]}" > "$RUNNER_TEMP/prs.json"
+
+      - name: Stamp the page
+        run: node scripts/stamp-prs.mjs "$RUNNER_TEMP/prs.json" site/index.html
+
+      - name: Commit if the card changed
+        run: |
+          if git diff --quiet; then
+            echo "The card is already right."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/index.html
+          git commit -m "chore: update the open pull request in the app picture"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

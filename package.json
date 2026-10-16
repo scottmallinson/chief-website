@@ -1,0 +1,21 @@
+{
+  "name": "chief-website",
+  "private": true,
+  "type": "module",
+  "description": "The public website for Chief. Static HTML, deployed by Vercel from site/.",
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "node --test scripts/*.test.mjs",
+    "test:e2e": "playwright test",
+    "serve": "node scripts/serve.mjs",
+    "verify": "npm run format:check && npm test && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "~1.62.1",
+    "prettier": "^3.5.1"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}
